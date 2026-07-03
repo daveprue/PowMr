@@ -13,7 +13,7 @@ substitutions:
   tx_pin: GPIO17
   rx_pin: GPIO16
   baud_rate: '2400'
-  version: "1.00"
+  version: "1.01"
 
 esphome:
   name: ${name}
