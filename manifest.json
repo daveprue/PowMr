@@ -1,0 +1,15 @@
+{
+  "name": "Dave Prue's PowMr HVM12KP Firmware",
+  "version": "1.0.1",
+  "builds": [
+    {
+      "chipFamily": "ESP32",
+      "ota": {
+        "md5": "b8eab34a4d036bca5105bd74cbc27ba0",
+        "path": "https://daveprue.github.io/PowMr/",
+        "release_url": "hvm12kp.ota.bin",
+        "summary": "Fixed Wi-Fi stability bugs and improved sensors."
+      }
+    }
+  ]
+}
