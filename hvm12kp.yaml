@@ -13,7 +13,7 @@ substitutions:
   tx_pin: GPIO17
   rx_pin: GPIO16
   baud_rate: '2400'
-  version: "1.00 Beta"
+  version: "1.00"
 
 esphome:
   name: ${name}
@@ -57,9 +57,6 @@ logger:
   #   sensor: ERROR
 api:
 
-ota:
-  platform: esphome
-
 #improv_serial:
 
 wifi:
@@ -71,9 +68,22 @@ wifi:
 captive_portal:
 
 dashboard_import:
-  package_import_url: github://daveprue/PowMr/hvn12kp.yaml@main
+  package_import_url: github://esphome/example-configs/esphome-web/esp32.yaml@main
   import_full_config: true
 
+http_request:
+  useragent: esphome/device
+  timeout: 10s
+
+ota:
+  - platform: esphome
+  - platform: http_request
+
+update:
+  - platform: http_request
+    name: "Firmware Update"
+    source: github://daveprue/PowMr/hvm12kp.ota.bin
+    
 esp32_improv:
   authorizer: none
 
