@@ -5,8 +5,8 @@
     {
       "chipFamily": "ESP32",
       "ota": {
-        "md5": "ca51b9aab167c78c10cc89aae8ba80d6",
-        "path": "https://daveprue.github.io/PowMr/hvm12kp.ota.bin",
+        "md5": "739826a5057a064f83c862c93feb0a1d",
+        "path": "https://daveprue.github.io/PowMr/hvm12kp_1.0.1.ota.bin",
         "release_url": "release_notes.html",
         "summary": "Fixed Wi-Fi stability bugs and improved sensors."
       }
