@@ -5,7 +5,7 @@
     {
       "chipFamily": "ESP32",
       "ota": {
-        "md5": "dd9398c663ce970012b8ad2cebf32c24",
+        "md5": "1234",
         "path": "https://daveprue.github.io/PowMr/pip/pip_1.0.1.ota.bin",
         "release_url": "release_notes.html",
         "summary": "Fixed Wi-Fi stability bugs and improved sensors."
