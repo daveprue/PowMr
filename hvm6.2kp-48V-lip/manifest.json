@@ -7,7 +7,6 @@
       "ota": {
         "md5": "09b4f6791a0790aecdeb4803683347f4",
         "path": "https://daveprue.github.io/PowMr/hvm6.2kp-48V-lip/inverter-firmware-1.0.1.ota.bin",
-        "release_url": "release_notes.html",
         "summary": "Fixed Wi-Fi stability bugs and improved sensors."
       }
     }
