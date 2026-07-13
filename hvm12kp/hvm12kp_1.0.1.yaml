@@ -1,0 +1,998 @@
+######################################################################################
+#
+#            ESPHome Project for PowMr POW-HVM12KP Inverter
+#
+#                        Dave Prue <dave@prue.com>
+#
+######################################################################################
+
+substitutions:
+  name: "inverter"
+  friendly_name: "HVM12KP"
+  device_description: "Monitor & Control Inverter via PIP over RS232 port"
+  tx_pin: GPIO17
+  rx_pin: GPIO16
+  baud_rate: '2400'
+  version: "1.0.1"
+
+esphome:
+  name: ${name}
+  friendly_name: ${friendly_name}
+  comment: ${device_description}
+  min_version: 2024.6.0
+  name_add_mac_suffix: False
+  project:
+    name: "Dave Prue.PowMr HVM12KP Inverter"
+    version: ${version}
+
+packages:
+  remote_package:
+    url: https://github.com/daveprue/esphome-local.git
+    ref: main
+    files:
+      - packages/WiFi-Diagnostics.yaml
+    refresh: 30s
+
+esp32:
+  board: esp32dev
+  flash_size: 16MB
+  framework:
+    type: esp-idf
+    sdkconfig_options:
+      CONFIG_ESP_HTTP_CLIENT_ENABLE_HTTPS: "y"
+      CONFIG_MBEDTLS_HAVE_TIME: "y"
+    advanced:
+      minimum_chip_revision: 3.1
+      sram1_as_iram: true
+
+update:
+  - platform: http_request
+    name: "Firmware Update"
+    id: inverter_firmware_update
+    source: "https://daveprue.github.io/PowMr/hvm12kp/manifest.json"
+    update_interval: 1h
+    
+external_components:
+  source: github://daveprue/pipsolar
+  components: [ pip8048 ]
+  refresh: 0s
+
+logger:
+  level: ERROR
+#  baud_rate: 0
+
+api:
+  on_client_connected:
+    - logger.log:
+        format: "Client %s connected to API with IP %s"
+        args: ["client_info.c_str()", "client_address.c_str()"]
+  on_client_disconnected:
+    - logger.log:
+        format: "Client %s disconnected from API with IP %s"
+        args: ["client_info.c_str()", "client_address.c_str()"]
+
+improv_serial:
+
+wifi:
+  ap:
+    ssid: "HVM12KP Inverter"
+#  ssid: !secret wifi_ssid
+#  password: !secret wifi_password
+
+captive_portal:
+
+dashboard_import:
+  package_import_url: github://esphome/example-configs/esphome-web/esp32.yaml@main
+  import_full_config: true
+
+http_request:
+  useragent: esphome/device
+  timeout: 10s
+
+ota:
+  - platform: esphome
+  - platform: http_request
+
+esp32_improv:
+  authorizer: none
+
+web_server:
+
+uart:
+  id: uart_0
+  tx_pin: ${tx_pin}
+  rx_pin: ${rx_pin}
+  baud_rate: ${baud_rate}
+  debug:
+    direction: BOTH
+    dummy_receiver: false
+    after:
+      delimiter: "\r"
+    sequence:
+      - lambda: UARTDebug::log_string(direction, bytes);
+
+time:
+  - platform: sntp
+
+status_led:
+    pin: 
+      number: GPIO02
+      ignore_strapping_warning: true
+      inverted: true
+
+pip8048:
+  id: inverter0
+  uart_id: uart_0
+  update_interval: 5.0s
+
+light:
+  - platform: binary
+    name: "Ready LED"
+    id: ready_led
+    internal: true
+    output: output_ready_led
+    restore_mode: ALWAYS_OFF
+  
+
+#---------------------------------------------------------------------------------------------------------------------------------------------------
+
+sensor:
+  - platform: pip8048
+    pipsolar_id: inverter0
+
+    grid_voltage:
+      name: "Grid Voltage"
+      id: ${name}_grid_voltage
+
+    grid_frequency:
+      name: "Grid Frequency"
+      id: ${name}_grid_frequency
+
+    ac_output_voltage:
+      name: "AC Output Voltage"
+      id: ${name}_ac_output_voltage
+
+    ac_output_frequency:
+      name: "AC Output Frequency"
+      id: ${name}_ac_output_frequency
+
+    ac_output_apparent_power:
+      name: "AC Output Apparent Power"
+      id: ${name}_ac_output_apparent_power
+
+    ac_output_active_power:
+      name: "AC Output Active Power"
+      id: ${name}_ac_output_active_power
+
+  - platform: template
+    name: "AC Output Current"
+    id: ${name}_ac_output_current
+    unit_of_measurement: "A"
+    device_class: current
+    state_class: measurement
+    accuracy_decimals: 0
+    update_interval: 5.0s
+    lambda: |-
+        float power = id(${name}_ac_output_active_power).state;
+        float volts = id(${name}_ac_output_voltage).state;
+        float current = 0.0;
+        
+        // Handle potential NaN/Invalid sensor readings safely
+        if (std::isnan(power)) power = 0.0;
+        if (std::isnan(volts)) volts = 0.0;
+
+        if (volts > 0) current = power / volts;
+        return current;
+
+  - platform: pip8048
+    pipsolar_id: inverter0
+  
+    output_load_percent:
+      name: "Output Load Percent"
+      id: ${name}_output_load_percent
+
+    bus_voltage:
+      name: "Bus Voltage"
+      id: ${name}_bus_voltage
+
+    battery_voltage:
+      name: "Battery Voltage"
+      id: ${name}_battery_voltage
+
+    battery_charging_current:
+      name: "Battery Charge Current"
+      id: ${name}_battery_charging_current
+
+  #  battery_capacity_percent:
+  #    name: "Battery Capacity Percent"
+  #    id: ${name}_battery_capacity_percent
+
+    inverter_heat_sink_temperature:
+      name: "Heat Sink Temperature"
+      id: ${name}_heat_sink_temperature
+
+    pv1_input_current:
+      name: "PV1 Input Current"
+      id: pv1_input_current
+
+    pv1_input_voltage:
+      name: "PV1 Input Voltage"
+      id: pv1_input_voltage
+
+    battery_voltage_scc:
+      name: "Battery Voltage SCC"
+      id: ${name}_batterry_voltage_scc
+
+    battery_discharge_current:
+      name: "Battery Discharge Current"
+      id: ${name}_battery_discharge_current
+
+    battery_voltage_offset_for_fans_on:
+      name: "Battery Voltage Fans Offset"
+      id: ${name}_battery_voltage_fans_offset
+
+    pv2_input_current:
+      name: "PV2 Input Current"
+      id: pv2_input_current
+
+    pv_total_power:
+      name: "PV Total Power"
+      id: pv_total_power
+
+    # QPIRI Data
+
+    grid_rating_voltage:
+      id: ${name}_grid_rating_voltage
+      name: "Rated Grid Voltage"
+      accuracy_decimals: 0
+
+    grid_rating_current:
+      id: ${name}_grid_rating_current
+      name: "Rated Grid Current"
+
+    ac_output_rating_voltage:
+      id: ${name}_ac_output_rating_voltage
+      name: "Rated AC Output Voltage"
+      accuracy_decimals: 0
+
+    ac_output_rating_frequency:
+      id: ${name}_ac_output_rating_frequency
+      name: "Rated AC Output Frequency"
+      accuracy_decimals: 0
+
+    ac_output_rating_current:
+      id: ${name}_ac_output_rating_current
+      name: "Rated AC Output Current"
+
+    ac_output_rating_apparent_power:
+      id: ${name}_ac_output_rating_apparent_power
+      name: "Rated AC Output Apparant Power"
+      accuracy_decimals: 0
+
+    ac_output_rating_active_power:
+      id: ${name}_ac_output_rating_active_power
+      name: "Rated AC Output Active Power"
+      accuracy_decimals: 0
+
+    battery_rating_voltage:
+      id: ${name}_battery_rating_voltage
+      name: "Rated Battery Voltage"
+      accuracy_decimals: 0
+
+    battery_under_voltage:
+      id: ${name}_battery_under_voltage
+      name: "Battery Under Voltage" 
+      internal: True
+
+    battery_bulk_voltage:
+      id: ${name}_battery_bulk_voltage
+      name: "Battery Charge Bulk Voltage"
+      internal: True
+
+    battery_float_voltage:
+      id: ${name}_battery_float_voltage
+      name: "Battery Charge Float Voltage"
+      internal: True
+
+    current_max_ac_charging_current:
+      id: ${name}_current_max_ac_charging_current
+      name: "Max AC Charge Current"
+      accuracy_decimals: 0
+      internal: True
+
+    current_max_charging_current:
+      id: ${name}_current_max_charging_current
+      name: "Max Charge Current"
+      accuracy_decimals: 0
+      internal: True
+
+    output_source_priority:
+      id: ${name}_output_source_priority
+      name: "Output Source Priority"
+      accuracy_decimals: 0
+      internal: True
+
+    parallel_max_num:
+      id: ${name}_parallel_max_num
+      name: "Parallel Max Num"
+      accuracy_decimals: 0
+
+    battery_redischarge_voltage:
+      id: ${name}_battery_redischarge_voltage
+      name: "Battery Redischarge Voltage"
+      device_class: voltage
+      state_class: measurement
+      unit_of_measurement: "V"
+      internal: True
+
+    pv_ok_condition_for_parallel:
+      id: ${name}_pv_ok_condition_for_parallel
+      name: "PV OK for Parallel"
+      accuracy_decimals: 0
+
+    pv_power_balance:
+      id: ${name}_pv_power_balance
+      name: "PV Power Balance"
+      accuracy_decimals: 0
+
+    battery_recharge_voltage:
+      id: ${name}_battery_recharge_voltage
+      name: "Battery Recharge Voltage"
+      internal: True
+
+    topology:
+      id: ${name}_topology_tmp
+      name: "Topology Tmp"
+      accuracy_decimals: 0
+      internal: True
+      on_value:
+        then:
+          lambda: |-
+            if (x == 0)
+              id(topology).publish_state("Transformerless");
+            else
+              id(topology).publish_state("Transformer");
+
+    battery_type:
+      id: battery_type
+      name: "Battery Type"
+      accuracy_decimals: 0
+      internal: True
+
+    charger_source_priority:
+      id: ${name}_charger_source_priority_tmp
+      name: "Charger Source Priority Tmp"
+      accuracy_decimals: 0
+      internal: True
+      on_value:
+        then:
+          lambda: |-
+            auto type = "";
+            switch(int(x)) {
+            case 0:
+              type = "Utility First";
+              break;
+            case 1:
+              type = "Solar First";
+              break;
+            case 2:
+              type = "Solar + Utility";
+              break;
+            case 3:
+              auto type = "Only Solar";
+              break;
+            }
+            id(charger_source).publish_state(type);
+
+    input_voltage_range:
+      name: "Input Voltage Range Tmp"
+      id: inp_range
+      accuracy_decimals: 0
+      internal: True
+      on_value:
+        then:
+          lambda: |-
+            auto type = "";
+            switch(int(x)) {
+            case 0:
+              type = "Appliance"; /* Wide */
+              break;
+            case 1:
+              type = "UPS";       /* Narrow */
+              break;
+            }
+            id(input_voltage_range).publish_state(type);
+
+    machine_type:
+      id: ${name}_mtype
+      name: "Machine Type Tmp"
+      accuracy_decimals: 0
+      internal: True
+      on_value:
+        then:
+          lambda: |-
+            auto type = "";
+            switch(int(x)) {
+            case 0:
+              type = "Grid Tie";
+              break;
+            case 1:
+              type = "Off Grid";
+              break;
+            case 10:
+              type = "Hybrid";
+              break;
+            }
+            id(machine_type).publish_state(type);
+
+    output_mode:
+      id: ${name}_omode
+      name: "Output Mode Tmp"
+      accuracy_decimals: 0
+      internal: True
+      on_value:
+        then:
+          lambda: |-
+            auto type = "";
+            switch(int(x)) {
+            case 0:
+              type = "Single Machine";
+              break;
+            case 1:
+              type = "Parallel";
+              break;
+            case 2:
+              type = "Phase 1 of 3";
+              break;
+            case 3:
+              type = "Phase 2 of 3";
+              break;
+            case 4:
+              type = "Phase 3 of 3";
+              break;
+            }
+            id(output_mode).publish_state(type);
+
+  - platform: template
+    name: "PV1 Input Power"
+    id: pv1_input_power
+    device_class: "power"
+    unit_of_measurement: "W"
+    update_interval: 5s
+    accuracy_decimals: 1
+    lambda: !lambda |-
+      return (id(pv1_input_voltage).state) * (id(pv1_input_current).state);
+
+  - platform: template
+    name: "PV2 Input Power"
+    id: pv2_input_power
+    device_class: "power"
+    unit_of_measurement: "W"
+    update_interval: 5s
+    accuracy_decimals: 1
+    lambda: !lambda |-
+      return ((id(pv_total_power).state) - (id(pv1_input_power).state));
+
+  - platform: template
+    name: "PV2 Input Voltage"
+    device_class: "voltage"
+    unit_of_measurement: "V"
+    update_interval: 5s
+    accuracy_decimals: 0
+    lambda: |-
+      if (id(pv2_input_current).state > 0.0) {
+        return id(pv2_input_power).state / id(pv2_input_current).state;
+      } else {
+        return 0.0;
+      }
+
+  - platform: template
+    name: "Grid Power"
+    id: ${name}_ac_input_power
+    unit_of_measurement: "W"
+    device_class: power
+    state_class: measurement
+    accuracy_decimals: 0
+    update_interval: 5.0s
+    lambda: |-
+      // Check if Grid Voltage is present (Inverter is connected to AC Input)
+      if (id(${name}_device_mode).state == "Line") {
+        float output_power = id(${name}_ac_output_active_power).state;
+        float charge_current = id(${name}_battery_charging_current).state;
+        float battery_volt = id(${name}_battery_voltage).state;
+        
+        // Handle potential NaN/Invalid sensor readings safely
+        if (std::isnan(output_power)) output_power = 0.0;
+        if (std::isnan(charge_current)) charge_current = 0.0;
+        if (std::isnan(battery_volt)) battery_volt = 0.0;
+
+        // Calculate battery charging power (Amps * Volts)
+        float charging_power = charge_current * battery_volt;
+        
+        // Total AC Input Power = Load Power + Charging Power
+        return output_power + charging_power;
+      } else {
+        // No grid/generator connected, AC input power is zero
+        return 0.0;
+      }
+
+text_sensor:
+  - platform: pip8048
+    pipsolar_id: inverter0
+
+    # last_qpigs:
+    #   name: "last qpigs"
+    # last_qpgs0:
+    #   name: "last qpgs0"
+    # last_qpiri:
+    #   name: "last qpiri"
+    # last_qmod:
+    #   name: "last qmod"
+    # last_qflag:
+    #   name: "last qflag"
+    # last_qpigs2:
+    #   name: "last qpigs2"
+    # last_qbatcd:
+    #   name: "last qbatcd"
+
+    device_mode:
+      id: ${name}_device_mode
+      name: "Device Mode"
+      filters:
+        map:
+          - P -> Power On
+          - S -> Standby
+          - L -> Line
+          - B -> Battery
+          - F -> Fault
+          - D -> Shutdown
+
+  - platform: template
+    id: topology
+    name: "Topology"
+ 
+  - platform: template
+    id: charger_source
+    name: "Charger Source Prioritty"
+
+  - platform: template
+    id: input_voltage_range
+    name: "Input Voltage Range"
+  
+  - platform: template
+    id: machine_type
+    name: "Machine Type"
+
+  - platform: template
+    id: output_mode
+    name: "Output Mode"
+
+output:
+  - platform: gpio
+    id: output_ready_led
+    pin: 
+      number: GPIO4
+      inverted: true
+      mode:
+        output: true
+        pullup: false
+
+  - platform: pip8048
+    pipsolar_id: inverter0
+
+    output_source_priority:
+      id: send_output_source_priority
+      
+    battery_recharge_voltage:
+      id: send_battery_recharge_voltage
+
+    battery_under_voltage:
+      id: send_battery_under_voltage
+
+    battery_bulk_voltage:
+      id: send_battery_bulk_voltage
+
+    battery_float_voltage:
+      id: send_battery_float_voltage
+
+    battery_type:
+      id: send_battery_type
+
+    enable_bypass_on_overload:
+      id: output_enable_bypass_on_overload
+
+    disable_bypass_on_overload:
+      id: output_disable_bypass_on_overload
+
+    max_ac_charging_current:
+      id: send_max_ac_charging
+
+    max_charging_current:
+      id: send_max_charging
+      
+    charger_source_priority:
+      id: send_charger_source_priority
+      
+    battery_redischarge_voltage:
+      id: send_battery_redischarge_voltage
+      
+    input_voltage_range:
+      id: send_input_voltage_range
+
+    enable_restart_on_overload:
+      id: output_enable_restart_on_overload
+
+    disable_restart_on_overload:
+      id: output_disable_restart_on_overload
+
+    enable_menu_returns_home:
+      id: output_enable_menu_returns_home
+
+    disable_menu_returns_home:
+      id: output_disable_menu_returns_home
+
+    enable_restart_on_over_temp:
+      id: output_enable_restart_on_over_temp
+
+    disable_restart_on_over_temp:
+      id: output_disable_restart_on_over_temp
+
+    enable_backlight:
+      id: output_enable_backlight
+
+    disable_backlight:
+      id: output_disable_backlight
+
+    enable_tones:
+      id: output_enable_tones
+
+    disable_tones:
+      id: output_disable_tones
+      
+      
+
+
+select:
+
+  - platform: template
+    name: "Inverter Mode"
+    id: inv_source_menu
+    options:
+      - "Solar-Utility-Battery (SUB)"
+      - "Solar-Battery-Utility (SBU)"
+    update_interval: 5s
+    lambda: !lambda |-
+      auto var = id(${name}_output_source_priority).state;
+      return id(inv_source_menu).at(var);
+    set_action:
+      then:
+        - logger.log: "Setting Inverter Mode"
+        - output.pipsolar.set_level:
+            id: send_output_source_priority
+            value: !lambda |-
+              return id(inv_source_menu).index_of(x).value();
+      
+  - platform: template
+    name: "AC Input Voltage Range"
+    id: select_input_voltage_range
+    options:
+      - "Appliance (90v - 280v)"
+      - "UPS (170v - 280v)"
+    update_interval: 5s
+    lambda: !lambda |-
+      auto var = id(inp_range).state;
+      return id(select_input_voltage_range).at(var);
+    set_action:
+      then:
+        - logger.log: "Setting AC Input Level"
+        - output.pipsolar.set_level:
+            id: send_input_voltage_range
+            value: !lambda |-
+              return id(select_input_voltage_range).index_of(x).value();
+
+
+      
+  - platform: template
+    name: "Battery Type"
+    id: select_battery_type
+    options:
+      - "AGM Lead Acid"
+      - "Flooded Lead Acid"
+      - "User Defined"
+      - "LIA Protocol"
+      - "Pylontech"
+      - "Techfine"
+      - "Growatt"
+      - "LIB Protocol"
+      - "LIC 3rd Party"
+      - "Felicity"
+    update_interval: 5s
+    lambda: !lambda |-
+      auto var = int(id(battery_type).state);
+      return id(select_battery_type).at(var);
+    set_action:
+      then:
+        - logger.log: "Setting Battery Type"
+        - lambda: 'id(battery_type).publish_state(id(select_battery_type).index_of(x).value());'
+        - output.pipsolar.set_level:
+            id: send_battery_type
+            value: !lambda |-
+              return id(select_battery_type).index_of(x).value();
+
+
+number:
+  - platform: template
+    name: "Charge Bulk"
+    lambda: !lambda return id(${name}_battery_bulk_voltage).state;
+    update_interval: 5s
+    entity_category: "CONFIG"
+    min_value: 48.0
+    max_value: 62.0
+    step: 0.1
+    mode: box
+    device_class: voltage
+    unit_of_measurement: "V"
+    set_action:
+      - logger.log: "Setting Battery Bulk Charge Voltage"
+      - output.pipsolar.set_level:
+          id: send_battery_bulk_voltage
+          value: !lambda return(x);
+
+  - platform: template
+    name: "Charge Float"
+    lambda: !lambda return id(${name}_battery_float_voltage).state;
+    entity_category: "CONFIG"
+    update_interval: 5s
+    min_value: 48
+    max_value: 62
+    step: 0.1
+    mode: box
+    device_class: voltage
+    unit_of_measurement: "V"
+    set_action:
+      - logger.log: "Setting Battery Float Voltage"
+      - output.pipsolar.set_level:
+          id: send_battery_float_voltage
+          value: !lambda return(x);
+
+  - platform: template
+    name: "Charge Start"
+    lambda: !lambda return id(${name}_battery_recharge_voltage).state;
+    entity_category: "CONFIG"
+    update_interval: 5s
+    min_value: 44
+    max_value: 57.2
+    step: 0.1
+    mode: box
+    device_class: voltage
+    unit_of_measurement: "V"
+    set_action:
+      - logger.log: "Setting Charge Start Voltage"
+      - output.pipsolar.set_level:
+          id: send_battery_recharge_voltage
+          value: !lambda return(x);
+
+  - platform: template
+    name: "Charge Stop"
+    lambda: !lambda return id(${name}_battery_redischarge_voltage).state;
+    entity_category: "CONFIG"
+    update_interval: 5s
+    min_value: 44
+    max_value: 56.8
+    step: 0.1
+    mode: box
+    device_class: voltage
+    unit_of_measurement: "V"
+    set_action:
+      - logger.log: "Setting Charge Stop Voltage"
+      - output.pipsolar.set_level:
+          id: send_battery_redischarge_voltage
+          value: !lambda return(x);
+
+  - platform: template
+    name: "Max AC Charge"
+    lambda: !lambda return id(${name}_current_max_ac_charging_current).state;
+    entity_category: "CONFIG"
+    update_interval: 5s
+    min_value: 10
+    max_value: 150
+    step: 10
+    mode: box
+    device_class: current
+    unit_of_measurement: "A"
+    set_action:
+      - logger.log: "Setting Max AC Charge Current"
+      - output.pipsolar.set_level:
+          id: send_max_ac_charging
+          value: !lambda return(x);
+      
+  - platform: template
+    name: "Max Total Charge"
+    lambda: !lambda return id(${name}_current_max_charging_current).state;
+    entity_category: "CONFIG"
+    update_interval: 5s
+    min_value: 10
+    max_value: 150
+    step: 10
+    mode: box
+    device_class: current
+    unit_of_measurement: "A"
+    set_action:
+      - logger.log: "Setting Total Max Charge Current"
+      - output.pipsolar.set_level:
+          id: send_max_charging
+          value: !lambda return(x);
+
+  - platform: template
+    name: "Battery UVP"
+    lambda: !lambda return id(${name}_battery_under_voltage).state;
+    entity_category: "CONFIG"
+    update_interval: 5s
+    min_value: 40
+    max_value: 54
+    step: 0.1
+    mode: box
+    device_class: voltage
+    unit_of_measurement: "V"
+    set_action:
+      - logger.log: "Setting Battery Under Voltage Protection"
+      - output.pipsolar.set_level:
+          id: send_battery_under_voltage
+          value: !lambda return(x);
+
+switch:
+  - platform: template
+    name: " Bypass on Battery Overload"
+    lambda: !lambda return id(binary_sensor_bypass_on_battery_overload).state;
+    turn_on_action:
+      - logger.log: "Turning On Bypass on Battery Overload"
+      - output.pipsolar.set_level:
+          id: output_enable_bypass_on_overload
+          value: !lambda return(0);
+    turn_off_action:
+      - logger.log: "Turning Off Bypass on Battery Overload"
+      - output.pipsolar.set_level:
+          id: output_disable_bypass_on_overload
+          value: !lambda return(0);
+
+  - platform: template
+    name: " Keypad Tones"
+    lambda: !lambda return id(binary_sensor_alarm).state;
+    turn_on_action:
+      - logger.log: "Turning On Key Tones"
+      - output.pipsolar.set_level:
+          id: output_enable_tones
+          value: !lambda return(0);
+    turn_off_action:
+      - logger.log: "Turning Off Key Tones"
+      - output.pipsolar.set_level:
+          id: output_disable_tones
+          value: !lambda return(0);
+
+  - platform: template
+    name: " Menu Returns Home"
+    lambda: !lambda return id(binary_sensor_lcd_escape_to_default).state;
+    turn_on_action:
+      - logger.log: "Setting Menu Returns Home"
+      - output.pipsolar.set_level:
+          id: output_enable_menu_returns_home
+          value: !lambda return(0);
+    turn_off_action:
+      - output.pipsolar.set_level:
+          id: output_disable_menu_returns_home
+          value: !lambda return(0);
+
+  - platform: template
+    name: " Remote Switch"
+    lambda: !lambda return id(binary_sensor_switch_on).state;
+    turn_on_action:
+      - logger.log: "Turning On Remote Switch"
+    turn_off_action:
+      - logger.log: "Turning Off Remote Switch"
+
+  - platform: template
+    name: " Restart on Over Temp"
+    lambda: !lambda return id(binary_sensor_restart_on_over_temp).state;
+    turn_on_action:
+      - logger.log: "Turning On Restart on Overtemp"
+      - output.pipsolar.set_level:
+          id: output_enable_restart_on_over_temp
+          value: !lambda return(0);
+    turn_off_action:
+      - logger.log: "Turning Off Restart on Overtemp"
+      - output.pipsolar.set_level:
+          id: output_disable_restart_on_over_temp
+          value: !lambda return(0);
+
+    # - platform: template
+    #   name: " Energy Saving Mode"
+    #   lambda: !lambda if (id(binary_sensor_power_saving).state) return 1; else return 0;
+    #   turn_on_action:
+    #     - logger.log: "Turning On Energy Saving Mode"
+    #   turn_off_action:
+    #     - logger.log: "Turning On Energy Saving Mode"
+
+    # - platform: template
+    #   name: " Equalization Mode"
+    #   lambda: !lambda if (id(binary_sensor_power_saving).state) return 1; else return 0;
+    #   turn_on_action:
+    #     - logger.log: "Turning On Equalization Mode"
+    #   turn_off_action:
+    #     - logger.log: "Turning On Equalization Mode"
+
+  - platform: template
+    name: " Restart on Overload"
+    lambda: !lambda return id(binary_sensor_restart_on_overload).state;
+    turn_on_action:
+      - logger.log: "Turning On Restart on Overload"
+      - output.pipsolar.set_level:
+          id: output_enable_restart_on_overload
+          value: !lambda return(0);
+    turn_off_action:
+      - logger.log: "Turning Off Restart on Overload"
+      - output.pipsolar.set_level:
+          id: output_disable_restart_on_overload
+          value: !lambda return(0);
+
+  - platform: template
+    name: " Screen Backlight"
+    lambda: !lambda return id(binary_sensor_backlight_on).state;
+    turn_on_action:
+      - logger.log: "Turning On Backlight"
+      - output.pipsolar.set_level:
+          id: output_enable_backlight
+          value: !lambda return(0);
+    turn_off_action:
+      - logger.log: "Turning Off Backlight"
+      - output.pipsolar.set_level:
+          id: output_disable_backlight
+          value: !lambda return(0);
+
+binary_sensor:
+    - platform: status
+      name: "Inverter API Status"
+      id: api_status
+      on_state_change:
+        then:
+          if:
+            condition:
+              binary_sensor.is_on: api_status
+            then:
+              light.turn_on: ready_led
+            else:
+              light.turn_off: ready_led
+
+    - platform: pip8048
+      pipsolar_id: inverter0
+
+      overload_restart_function:
+        id: binary_sensor_restart_on_overload
+        trigger_on_initial_state: true
+
+      overload_bypass_function:
+        id: binary_sensor_bypass_on_battery_overload
+        trigger_on_initial_state: true
+
+      power_saving:
+        id: binary_sensor_power_saving
+        trigger_on_initial_state: true
+
+      lcd_escape_to_default:
+        id: binary_sensor_lcd_escape_to_default
+        trigger_on_initial_state: true
+
+      switch_on:
+        id: binary_sensor_switch_on
+        trigger_on_initial_state: true
+
+      over_temperature_restart_function:
+        id: binary_sensor_restart_on_over_temp
+        trigger_on_initial_state: true
+
+      backlight_on:
+        id: binary_sensor_backlight_on
+        trigger_on_initial_state: true
+
+      silence_buzzer_open_buzzer:
+        id: binary_sensor_alarm
+        trigger_on_initial_state: true
