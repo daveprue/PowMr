@@ -2,12 +2,13 @@
 setlocal enabledelayedexpansion
 
 :: Define file names
-set "BIN_FILE=pip_1.0.1.ota.bin"
+set "BIN_FILE=%1"
 set "MANIFEST_FILE=manifest.json"
 
 :: Check if the bin file exists
 if not exist "%BIN_FILE%" (
     echo Error: %BIN_FILE% not found!
+    pause
     exit /b 1
 )
 
