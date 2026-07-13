@@ -1,0 +1,15 @@
+{
+  "name": "Dave Prue's Inverter WiFi Adapter",
+  "version": "1.0.1",
+  "builds": [
+    {
+      "chipFamily": "ESP32",
+      "ota": {
+        "md5": "459a68ea7bd2fac7e13872a57dcfc913",
+        "path": "https://daveprue.github.io/PowMr/hvm6.2kp-48V-lip/inverter-firmware-1.0.0.ota.bin",
+        "release_url": "release_notes.html",
+        "summary": "Fixed Wi-Fi stability bugs and improved sensors."
+      }
+    }
+  ]
+}
