@@ -5,7 +5,7 @@
     {
       "chipFamily": "ESP32",
       "ota": {
-        "md5": "09b4f6791a0790aecdeb4803683347f4",
+        "md5": "05e5c9d39e3082a3afd6cf6a8741f0be",
         "path": "https://daveprue.github.io/PowMr/hvm6.2kp-48V-lip/inverter-firmware-1.0.1.ota.bin",
         "summary": "**Changelog**\r\n* Enabled remote binary updates\r\n* Fixed Wi-Fi stability bugs and improved sensors."
       }
